@@ -18,8 +18,10 @@ phases.
 ### A. Identity and academic administration
 
 -   [ ] Login and account lifecycle
--   [ ] Role-based access for students, faculty, HOD/coordinators, and
-    administrators
+-   [ ] Role-based access for students, faculty, faculty mentors, department
+    leave executives, HOD/coordinators, and administrators
+-   [ ] Student-to-faculty mentor mapping
+-   [ ] Department-specific HOD and Leave Executive role assignments
 -   [ ] Department, program, semester, academic year, and course
     management
 -   [ ] Course offerings and faculty allocation
@@ -37,6 +39,8 @@ phases.
 -   [ ] Upcoming classes and deadlines
 -   [ ] Flashcard decks and review history
 -   [ ] Assignment submission and status
+-   [ ] Leave application submission with medical prescription upload
+-   [ ] Multi-tier leave status tracking (Mentor -> HOD -> Approved/Rejected)
 -   [ ] Chapter practice progress
 -   [ ] Official chapter completion status
 -   [ ] AI tutor chat
@@ -46,6 +50,9 @@ phases.
 ### C. Faculty workspace
 
 -   [ ] Faculty dashboard and class schedule
+-   [ ] Mentor leave verification queue for assigned mentees
+-   [ ] Prescription document inspector with attendance context
+-   [ ] Mentor verification remarks and forward/reject actions
 -   [ ] Upload, organize, version, and approve learning resources
 -   [ ] Map resources to subjects, chapters, and learning outcomes
 -   [ ] Create and manage assignments
@@ -61,6 +68,10 @@ phases.
 ### D. Management and academic intelligence
 
 -   [ ] Academic Command Center
+-   [ ] Department-scoped HOD and Leave Executive decision console
+-   [ ] Clinic blacklist management (flag/ban clinics issuing suspicious medicals)
+-   [ ] Clinic certificate concentration monitoring and fake medical fraud alerts
+-   [ ] Discretionary HOD approval override for blacklisted clinics with audit logging
 -   [ ] Syllabus coverage versus planned schedule
 -   [ ] Chapter completion and assessment overview
 -   [ ] Assignment evaluation backlog
@@ -127,7 +138,24 @@ phases.
 -   [ ] Official chapter completion record
 -   [ ] Handling for network interruptions and approved retakes
 
-### I. Premium and later-stage features
+### I. Student leave and medical verification system
+
+-   [ ] Student leave application creation with leave type, date range, and reason
+-   [ ] Mandatory medical prescription/certificate upload (PDF, JPEG, PNG)
+-   [ ] Prescription metadata entry (clinic/hospital name, consulting doctor, registration number, issue date)
+-   [ ] Secure file storage in object storage with virus/mime-type validation and presigned URLs
+-   [ ] Automated routing to assigned faculty mentor (Tier 1 verification)
+-   [ ] Mentor verification workspace with mentee attendance context and recommendation remarks
+-   [ ] Routing to department HOD or designated Leave Executive (Tier 2 verification)
+-   [ ] Department-level administrative boundary isolation for leave queues and approvals
+-   [ ] Central management clinic blacklist registry (ban or flag fraudulent clinics)
+-   [ ] Clinic submission frequency monitoring and fake certificate fraud alert triggers
+-   [ ] Non-blocking warning banners on mentor and HOD review interfaces for blacklisted clinics
+-   [ ] HOD discretionary final decision authority with mandatory justification note for overrides
+-   [ ] Automated synchronization of approved leaves with official attendance registers
+-   [ ] Immutable audit trail logging all submissions, reviews, clinic fraud flags, and approval overrides
+
+### J. Premium and later-stage features
 
 -   [ ] AI assessment/question-paper studio
 -   [ ] Course outcome and program outcome mapping
@@ -140,7 +168,7 @@ phases.
 -   [ ] Existing LMS/ERP/SSO integration
 -   [ ] Multi-college tenancy and institutional configuration
 
-### J. Production readiness
+### K. Production readiness
 
 -   [ ] Automated tests and CI/CD
 -   [ ] Staging and production environments
@@ -202,6 +230,8 @@ structure.
 -   [ ] Department, program, semester, and academic year records.
 -   [ ] Course and course-offering records.
 -   [ ] Faculty allocation and student enrollment.
+-   [ ] Student-to-faculty mentor mappings and department leave executive
+    role assignments.
 -   [ ] Subjects, chapters, and chapter ordering.
 -   [ ] Resource metadata and upload flow.
 -   [ ] Student, faculty, and admin dashboard shells.
@@ -437,6 +467,63 @@ early-warning flags are explainable and correctable.
 
 ------------------------------------------------------------------------
 
+## Phase 8b --- Student leave and medical verification workflow
+
+**Goal:** Establish an auditable, multi-tier medical leave approval
+process with prescription verification, clinic blacklisting, and
+department-scoped executive governance.
+
+### Build
+
+-   [ ] Leave schema: `student_mentor_assignments`, `leave_applications`,
+    `leave_attachments`, `medical_clinics`, `clinic_ban_records`,
+    `department_leave_executives`, and `leave_approval_actions`.
+-   [ ] Prescription document upload to object storage with virus scan,
+    file validation (PDF/JPEG/PNG), and secure pre-signed URL generation.
+-   [ ] Student leave request interface with start/end date range, leave
+    type, justification, and doctor/clinic metadata fields.
+-   [ ] Tier 1 mentor verification workspace: view mentee prescriptions,
+    inspect attendance history and deficit, add recommendation remarks,
+    and forward or reject.
+-   [ ] Department-scoped routing: partition leave queues strictly by
+    student department, routing only to that department's HOD or
+    designated Leave Executives.
+-   [ ] Central clinic blacklist management: administrative console for
+    college management to search, flag, and ban clinics issuing
+    suspicious medical certificates with documented ban reasons.
+-   [ ] Anomaly detection & fake medical alerts: aggregate clinic
+    submission volume and display non-blocking fraud warning banners on
+    both mentor and HOD interfaces when a prescription originates from a
+    blacklisted clinic.
+-   [ ] Tier 2 HOD / Leave Executive decision console: review mentor
+    recommendations and prescription details; exercise final
+    discretionary approval or rejection.
+-   [ ] Mandatory override audit logging: require the HOD to record a
+    formal rationale when approving a leave associated with a blacklisted
+    clinic.
+-   [ ] Attendance reconciliation: automatically sync approved medical
+    leaves with attendance records to mark officially excused absences.
+-   [ ] Strict privacy controls and immutable audit log for all leave
+    lifecycle actions.
+
+### Deliverable
+
+Students can apply for leave with medical prescriptions, mentors verify
+and recommend, and department HODs retain final approval authority with
+system-assisted warnings against fraudulent clinics.
+
+### Exit criteria
+
+End-to-end tests verify student submission, mentor endorsement, and HOD
+decision. Security tests prove that HODs/executives from Department A
+cannot access or approve leaves for Department B. Blacklist tests confirm
+that submitting a prescription from a banned clinic surfaces clear fraud
+warnings to both mentor and HOD, but preserves the HOD's final authority to
+grant a reasoned discretionary approval. Prescription documents are
+inaccessible to unauthorized users.
+
+------------------------------------------------------------------------
+
 ## Phase 9 --- Pilot hardening and institutional rollout
 
 **Goal:** Prove usability, security, reliability, and value before
@@ -561,6 +648,7 @@ agentic-lms/
 │   │   │   ├── tutor/
 │   │   │   ├── labs/
 │   │   │   ├── assessments/
+│   │   │   ├── leaves/
 │   │   │   └── analytics/
 │   │   ├── workers/            # Background jobs
 │   │   ├── integrations/       # Email, LLM, storage, runner

@@ -15,12 +15,14 @@ Primary outcomes: - Give students subject-wise resources, pre-class
 flashcards, assignments, AI tutoring, programming labs, and chapter
 completion tests. - Help faculty plan classes, manage learning content,
 create assessments, monitor progress, and conduct classroom tests. -
-Give authorized management staff visibility into syllabus progress,
-assessment completion, operational issues, and academic evidence. -
-Automate repetitive workflows with auditable, permission-controlled
-services. - Keep official academic records deterministic and
-explainable; AI recommendations must not silently alter grades or
-completion status.
+Provide transparent, auditable student leave applications with prescription
+verification, multi-tier approvals (mentor to HOD), clinic blacklisting, and
+department-scoped governance. - Give authorized management staff visibility
+into syllabus progress, assessment completion, operational issues, and
+academic evidence. - Automate repetitive workflows with auditable,
+permission-controlled services. - Keep official academic records
+deterministic and explainable; AI recommendations must not silently alter
+grades, attendance exemptions, or completion status.
 
 ## 2. Architecture principles
 
@@ -171,10 +173,13 @@ there is a concrete requirement.
 
 -   Users, roles, department memberships, course enrollment, account
     status.
--   Suggested roles: student, faculty, HOD/academic coordinator,
-    institution admin, support operator.
+-   Suggested roles: student, faculty, faculty mentor, department leave
+    executive, HOD/academic coordinator, institution admin, support operator.
+-   Student-to-mentor assignment mappings and department-level
+    approval authority delegation.
 -   Enforce permissions on the server for every resource and action.
--   Scope management access by department and responsibility.
+-   Scope management access and leave approval queues by department and
+    responsibility.
 -   Prefer college SSO if the institution supports it.
 
 ### 5.2 Academic structure
@@ -289,9 +294,63 @@ mode and must not disclose restricted questions or answers.
     academic reviews.
 -   Faculty workload/timetable conflict checks.
 -   AI question-paper drafting with faculty approval.
+-   Clinic oversight and fake medical fraud mitigation: track clinic
+    certificate volume, flag suspicious medical facilities, and maintain
+    an institution-level clinic blacklist.
 -   Placement skill evidence and student portfolio as later modules.
 -   AI usage, delivery failures, code-runner health, and service cost
     dashboards.
+
+### 5.11 Student leave and medical verification system
+
+-   **Prescription and leave application intake:**
+    -   Students apply for leave with start/end dates, session impact,
+        reason, and mandatory medical prescription/certificate upload
+        (PDF, JPEG, PNG).
+    -   Capture structured prescription metadata: clinic/hospital name,
+        consulting doctor name, medical registration/license number,
+        and issue date.
+    -   Prescriptions are stored in object storage with mime-type/virus
+        validation and served via short-lived, pre-signed URLs.
+-   **Multi-tier verification workflow:**
+    -   *Tier 1 (Faculty Mentor Verification):* The leave request is
+        automatically routed first to the student's designated faculty
+        mentor. The mentor reviews the prescription, verifies attendance
+        impact, adds verification remarks (recommend approval, recommend
+        rejection, or request physical document verification), and
+        forwards the application.
+    -   *Tier 2 (Department HOD / Leave Executive Verification):*
+        Following mentor verification, the request enters the
+        department's executive review queue for final decision.
+-   **Department-scoped authority and delegation:**
+    -   Each academic department has its own Head of Department (HOD)
+        and designated Leave Executives authorized to approve leaves.
+    -   Approval queues and records are strictly segregated by
+        department; personnel cannot review or decide leaves for
+        students belonging to other departments.
+-   **Clinic blacklisting and fraud mitigation:**
+    -   Management and college administration can flag or ban (blacklist)
+        specific clinics, hospitals, or practitioners when repeated
+        suspicious medical certificates or fraudulent patterns are detected.
+    -   The system tracks clinic submission frequencies across the
+        student body, generating fraud alerts when an anomalous
+        concentration of certificates originates from a single clinic.
+-   **HOD final decision authority and discretionary override:**
+    -   When a student prescription originates from a banned or flagged
+        clinic, the system attaches a prominent fraud warning badge with
+        historical reasons on both mentor and HOD verification screens.
+    -   The system does *not* auto-reject or hard-block the leave; the
+        **final decision authority strictly lies in the hands of the
+        department HOD (or authorized Leave Executive)**.
+    -   The HOD retains full discretion to approve the leave (requiring a
+        mandatory recorded audit reason/justification), reject it, or
+        require a physical evaluation by the college medical officer.
+-   **Attendance reconciliation and audit trail:**
+    -   Approved medical leaves automatically adjust official attendance
+        registers to reflect excused medical absences.
+    -   An immutable audit log records every action: submission, mentor
+        endorsements, clinic fraud warning triggers, and HOD decisions
+        or discretionary overrides.
 
 ## 6. Initial data model
 
@@ -310,6 +369,10 @@ Core entities and relationships:
 -   `assessment_sessions`, `assessment_questions`,
     `assessment_attempts`, `assessment_responses`
 -   `chapter_progress`, `chapter_completions`
+-   `student_mentor_assignments`
+-   `leave_applications`, `leave_attachments`
+-   `medical_clinics`, `clinic_ban_records`
+-   `department_leave_executives`, `leave_approval_actions`
 -   `notifications`, `notification_jobs`, `notification_delivery_events`
 -   `ai_conversations`, `ai_messages`, `ai_feedback`
 -   `intervention_flags`, `intervention_actions`
@@ -327,7 +390,8 @@ Use versioned REST endpoints, for example `/api/v1`.
 Suggested domains: - `/auth`, `/users`, `/roles` - `/departments`,
 `/programs`, `/semesters` - `/courses`, `/course-offerings`,
 `/enrollments` - `/subjects`, `/chapters`, `/resources` - `/classes`,
-`/flashcards` - `/assignments`, `/submissions` - `/tutor/conversations`,
+`/flashcards` - `/assignments`, `/submissions` - `/leaves`, `/clinics`,
+`/mentors`, `/department-leave-executives` - `/tutor/conversations`,
 `/tutor/messages`, `/tutor/feedback` - `/labs`, `/code-runs` -
 `/assessment-sessions`, `/assessment-attempts` - `/progress`,
 `/analytics` - `/notifications`, `/admin`, `/audit`
@@ -336,9 +400,13 @@ Rules: - Validate input and output with Pydantic schemas. - Keep
 authorization in backend services, not only frontend route guards. - Use
 pagination and filters for lists. - Use idempotency keys for repeatable
 creation/notification operations. - Use explicit state transitions for
-assignments, sessions, attempts, and completion records. - Never return
-hidden tests, answer keys, private course content, or unauthorized
-student records.
+assignments, sessions, attempts, completion records, and leave applications.
+- Enforce multi-tier state transitions for leave requests (e.g. `draft` ->
+`submitted` -> `mentor_verified` -> `approved` / `rejected` /
+`clarification_requested`). - Restrict medical prescription document access
+strictly to the student applicant, assigned mentor, and department HOD/leave
+executives. - Never return hidden tests, answer keys, private course content,
+or unauthorized student records.
 
 ## 8. Agent design and tool permissions
 
@@ -376,6 +444,13 @@ programs.
                           rubric/tests            authoritative scoring
                                                   to free-form LLM
                                                   judgement alone
+
+  Leave and clinic        Read leave metadata and Cannot approve or reject
+  fraud monitor           clinic registry; flag   leaves; cannot ban
+                          suspicious certificate  clinics without
+                          frequency and           management confirmation;
+                          blacklisted clinics     cannot disclose medical
+                                                  data outside workflow
   -----------------------------------------------------------------------
 
 Log tool calls and side effects. Use allowlisted tools, timeouts,
@@ -400,6 +475,10 @@ token/cost limits, and human confirmation for consequential actions.
 -   Protect against prompt injection in uploaded documents; retrieved
     content is data, not instructions.
 -   Restrict uploads and scan for malicious files.
+-   Medical record privacy: uploaded prescriptions and medical diagnoses
+    are classified as sensitive student records; access is strictly
+    restricted to the applicant student, assigned mentor, and authorized
+    department HOD/leave executive, with audit logs recorded on access.
 -   Rate-limit AI and code execution; define usage quotas.
 -   Review applicable Indian data-protection requirements, institutional
     IT policies, contracts, notices, and consent requirements with the
@@ -450,5 +529,10 @@ scaling requirements.
     rules.
 -   Management analytics are based on validated data with role-scoped
     access.
+-   Multi-tier leave verification with HOD final authority: medical
+    leaves follow a sequential mentor-to-HOD verification pipeline
+    scoped strictly by academic department. Management clinic bans surface
+    fraud warning alerts, but final approval discretion remains with the
+    HOD with mandatory audit logging.
 -   Integrations and multi-college tenancy should be designed
     deliberately before offering the product to multiple institutions.
